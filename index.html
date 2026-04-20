@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PES University - Smart Attendance System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="stars" id="stars1"></div>
+<div class="stars2" id="stars2"></div>
+<div class="stars3" id="stars3"></div>
+<div id="meteors"></div>
+
+<div class="card">
+    <div class="pes-logo">🏛️ PES UNIVERSITY | EC CAMPUS</div>
+    <h1>🌌 Smart Attendance</h1>
+    <div class="subtitle">Biometric Face Recognition System</div>
+    
+    <div class="video-container">
+        <video id="video" autoplay playsinline></video>
+    </div>
+    
+    <div class="button-group">
+        <button class="btn-attendance" onclick="markAttendance()">
+            📸 Mark Attendance
+        </button>
+        <button class="btn-check" onclick="checkMyLocation()">
+            📍 Check
+        </button>
+    </div>
+    
+    <div id="status">✨ Ready to mark attendance</div>
+    
+    <div class="rars-panel" id="rarsPanel">
+        <div class="rars-title">
+            📊 RARS Assembly Output
+        </div>
+        <div class="rars-content" id="rarsContent">
+            Loading statistics...
+        </div>
+    </div>
+</div>
+
+<script>
+const video = document.getElementById("video");
+
+// 🎥 Initialize Camera
+navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+        video.srcObject = stream;
+    })
+    .catch(err => {
+        console.error("Camera error:", err);
+        document.getElementById("status").innerText = "❌ Camera access denied";
+        document.getElementById("status").style.color = "#ff4d4d";
+    });
+
+// ⭐ Generate Stars
+function createStars(id, count) {
+    const container = document.getElementById(id);
+    for (let i = 0; i < count; i++) {
+        let star = document.createElement("div");
+        star.className = "star";
+        star.style.left = Math.random() * 100 + "vw";
+        star.style.top = Math.random() * 100 + "vh";
+        star.style.animationDelay = Math.random() * 50 + "s";
+        container.appendChild(star);
+    }
+}
+
+createStars("stars1", 150);
+createStars("stars2", 80);
+createStars("stars3", 40);
+
+// 🌠 Create Shooting Stars
+function createMeteor() {
+    const meteor = document.createElement("div");
+    meteor.className = "shooting-star";
+    meteor.style.top = Math.random() * 50 + "vh";
+    meteor.style.left = Math.random() * 100 + "vw";
+    meteor.style.animationDelay = Math.random() * 5 + "s";
+    document.body.appendChild(meteor);
+    setTimeout(() => meteor.remove(), 5000);
+}
+
+setInterval(() => {
+    if (Math.random() > 0.7) {
+        createMeteor();
+    }
+}, 2000);
+
+// 📍 Check Location Function
+function checkMyLocation() {
+    const statusBox = document.getElementById("status");
+    statusBox.innerHTML = "📍 Getting your location... <div class='loading'></div>";
+    statusBox.style.color = "white";
+    
+    if (!navigator.geolocation) {
+        statusBox.innerHTML = "❌ Geolocation not supported by your browser";
+        statusBox.style.color = "#ff4d4d";
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            fetch("http://127.0.0.1:5000/check_location", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lat: pos.coords.latitude,
+                    lon: pos.coords.longitude
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const status = data.within_campus ? "✅ WITHIN CAMPUS" : "❌ OUTSIDE CAMPUS";
+                    statusBox.innerHTML = `📍 ${data.message}\n📏 Allowed Radius: ${data.allowed_radius_km} km\n${status}`;
+                    statusBox.style.color = data.within_campus ? "#00ffcc" : "#ffaa00";
+                } else {
+                    statusBox.innerHTML = "❌ Error checking location: " + data.error;
+                    statusBox.style.color = "#ff4d4d";
+                }
+            })
+            .catch(err => {
+                statusBox.innerHTML = "❌ Cannot connect to server. Is backend running?";
+                statusBox.style.color = "#ff4d4d";
+            });
+        },
+        (error) => {
+            let errorMsg = "❌ Location access denied";
+            if (error.code === 1) errorMsg = "❌ Please allow location access to mark attendance";
+            if (error.code === 2) errorMsg = "❌ Location unavailable. Check your GPS";
+            if (error.code === 3) errorMsg = "❌ Location request timeout. Try again";
+            statusBox.innerHTML = errorMsg;
+            statusBox.style.color = "#ff4d4d";
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+// 🚀 Mark Attendance Function
+function markAttendance() {
+    const statusBox = document.getElementById("status");
+    const rarsPanel = document.getElementById("rarsPanel");
+    
+    statusBox.innerHTML = "⏳ Processing... <div class='loading'></div>";
+    statusBox.style.color = "white";
+    rarsPanel.style.display = "none";
+    
+    // Capture image from video
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext("2d");
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+    
+    const image = canvas.toDataURL("image/jpeg");
+    
+    // Get current location
+    if (!navigator.geolocation) {
+        statusBox.innerHTML = "❌ Geolocation not supported";
+        statusBox.style.color = "#ff4d4d";
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            // Send to backend
+            fetch("http://127.0.0.1:5000/mark_attendance", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    image: image,
+                    lat: pos.coords.latitude,
+                    lon: pos.coords.longitude
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    let message = data.message;
+                    if (data.distance) {
+                        message += `\n📍 Distance from campus: ${data.distance} km`;
+                    }
+                    statusBox.innerHTML = message;
+                    statusBox.style.color = "#00ffcc";
+                    
+                    // Show RARS statistics if available
+                    if (data.stats) {
+                        const rarsContent = document.getElementById("rarsContent");
+                        rarsContent.innerHTML = `
+                            📚 <span>Total Students:</span> ${data.stats.total_students}<br>
+                            🔢 <span>Sum of Roll Nos:</span> ${data.stats.sum_rollnos}<br>
+                            📊 <span>Average Roll No:</span> ${data.stats.avg_roll}<br>
+                            🏆 <span>Maximum Roll No:</span> ${data.stats.max_roll}
+                        `;
+                        rarsPanel.style.display = "block";
+                        
+                        // Auto hide after 8 seconds
+                        setTimeout(() => {
+                            rarsPanel.style.display = "none";
+                        }, 8000);
+                    }
+                } else {
+                    statusBox.innerHTML = data.message;
+                    statusBox.style.color = "#ff4d4d";
+                }
+            })
+            .catch((err) => {
+                console.error("Fetch error:", err);
+                statusBox.innerHTML = "❌ Server error. Please ensure backend is running on port 5000";
+                statusBox.style.color = "#ff4d4d";
+            });
+        },
+        (error) => {
+            console.error("Geolocation error:", error);
+            let errorMsg = "❌ Location access denied";
+            if (error.code === 1) errorMsg = "❌ Please allow location access to mark attendance";
+            if (error.code === 2) errorMsg = "❌ Location unavailable. Please enable GPS";
+            if (error.code === 3) errorMsg = "❌ Location request timeout. Try again";
+            statusBox.innerHTML = errorMsg;
+            statusBox.style.color = "#ff4d4d";
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+</script>
+
+</body>
+</html>
