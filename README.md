@@ -1,4 +1,4 @@
-# Microprocessor-and-Computer-Architecture-MINI-PROJECT
+# BIOMETRIC ATTENDENCE SYSTEM USING FACE RECOGNITION
  mini project titled "Biometric Classroom Attendance System" for  MPCA course. The project includes RISC-V assembly programming using the RARS simulator
 Project Overview:
 The system is a web-based application that uses face recognition to mark student attendance. A student opens the website, allows camera access, and captures their face. The system compares the captured image with pre-stored student images and identifies the person. Attendance is marked only if:
